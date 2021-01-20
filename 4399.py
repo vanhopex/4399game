@@ -9,15 +9,24 @@
  
 '''
 import operator
+import time
 import win32gui
-from PIL import ImageGrab, Image
+from PIL import ImageGrab
 import numpy as np
+from pymouse import PyMouse
+
 
 class GameAssist:
     def __init__(self, wdname):
+        self.num_matrix = []
+        self.map_matrix = []
 
+        self.width = 71
+        self.base_x =  399
+        self.base_y =  305
+
+        self.mouse = PyMouse()
         # 获取窗口的句柄
-
         self.hwnd = win32gui.FindWindow(0, wdname)
 
         if self.hwnd == 0:
@@ -26,8 +35,8 @@ class GameAssist:
         # 将该窗口显示在最前面
         win32gui.SetForegroundWindow(self.hwnd)
 
-        # 开始
-        self.start()
+
+
 
 
     def screen_grab(self):
@@ -53,8 +62,7 @@ class GameAssist:
                 # 小图标右下角的坐标
                 x2 = x1 + offset
                 y2 = y1 + offset
-                # animals_iamge.crop((x1, y1, x2, y2)).show()
-                # animals_iamge.crop((x1, y1, x2, y2)).save('animal'+str(i)+str(j)+".jpg")
+
                 images_row.append(animals_iamge.crop((x1+5, y1+5, x2-5, y2-5)))
 
             images_list.append(images_row)
@@ -72,33 +80,6 @@ class GameAssist:
 
     def image2num(self, animal_images):
 
-        # im = animal_images[0][0]
-        # test = im.convert("L")
-        # # print(type(test))
-        # # print(test.getdata())
-        # # im.show()
-        # # print(im.size) # size is 71*71
-        # # im_L = im.resize((20,20), Image.ANTIALIAS).convert("L")
-        # # print(im_L)
-        # # pixels = list(im_L.getdada())
-        # # print(pixels)
-        # #
-        # im_L = im.convert("L")
-        # pixels = list(im_L.getdata())
-        # im_L.show()
-        # # print(list(im.getdata()))
-        # # print(list(im_L.getdata()))
-        #
-        # avg = sum(pixels) / len(pixels)
-        #
-        #
-        # hash = "".join(map(lambda x: "1" if x > avg else "0", pixels))
-        # print(type(hash))
-        #
-        # print(sum(map(operator.ne, hash, hash)))
-        # # print(avg)
-
-        # num_matrix = np.zeros((8,12), str)
         num_str01_matrix = []
 
         for i in range(8):
@@ -136,9 +117,108 @@ class GameAssist:
                     num_matrix[i][j] = len(image_type_list)
                 else:
                     num_matrix[i][j] = index+1
-        # print(num_matrix)
-        # print(image_type_list)
         return num_matrix
+
+    def get_direct_connected(self, x, y):
+        # 同一行直接相连的点
+        ans_list = []
+
+        row =  x - 1
+        while row >= 0:
+           if self.map_matrix[row][y] == 0:
+                ans_list.append([row, y])
+           else:
+                break
+           row = row - 1
+
+        row = x + 1
+        while row < self.map_matrix.shape[0]:
+            if self.map_matrix[row][y] == 0:
+                ans_list.append([row, y])
+            else:
+                break
+            row = row + 1
+
+        col = y - 1
+        while col >= 0:
+            if self.map_matrix[x][col] == 0:
+                ans_list.append([x, col])
+            else:
+                break
+            col = col - 1
+
+        col = y + 1
+        while col < self.map_matrix.shape[1]:
+            if self.map_matrix[x][col] == 0:
+                ans_list.append([x, col])
+            else:
+                break
+
+            col = col + 1
+
+        return ans_list
+
+
+    def is_row_connected(self, x, y1,  y2):
+        if y1 > y2:
+            tmp = y1
+            y1  = y2
+            y2  = tmp
+        for i in range(y1+1, y2):
+            if self.map_matrix[x][i] != 0:
+                return False
+        return True
+
+
+
+    def is_col_connected(self, x1, x2, y):
+        if x1 > x2:
+            tmp = x1
+            x1 = x2
+            x2 = tmp
+        for i in range(x1+1, x2):
+            if self.map_matrix[i][y] != 0:
+                return False
+        return True
+
+
+
+    def is_reachable(self, x1, y1, x2, y2):
+        # 如果数字不相同，直接返回不可到达
+        if self.map_matrix[x1][y1] != self.map_matrix[x2][y2]:
+            return False
+
+        list1  = self.get_direct_connected(x1, y1)
+        list2  = self.get_direct_connected(x2, y2)
+
+        for x1,y1 in list1:
+            for x2,y2 in list2:
+
+                if x1 == x2:
+                    if self.is_row_connected(x1, y1, y2):
+                        return True
+
+                elif y1 == y2:
+                    if self.is_col_connected(x1, x2, y2):
+                        return True
+        return False
+
+
+    def click_and_set0(self, x1, y1, x2, y2):
+        # 确定需要点击的坐标的中心位置
+        c_x1 =  int(self.base_x + (y1 - 1)*self.width + self.width/2)
+        c_y1 =  int(self.base_y + (x1 - 1)*self.width + self.width/2)
+
+        c_x2 =  int(self.base_x + (y2 - 1)*self.width + self.width/2)
+        c_y2 =  int(self.base_y + (x2 - 1)*self.width + self.width/2)
+
+        time.sleep(1)
+        self.mouse.click(c_x1, c_y1)
+        time.sleep(1)
+        self.mouse.click(c_x2, c_y2)
+
+        self.map_matrix[x1][y1] = 0
+        self.map_matrix[x2][y2] = 0
 
 
 
@@ -146,16 +226,45 @@ class GameAssist:
         # 获取图像矩阵
         animal_images = self.screen_grab()
         # 获取图标的数字矩阵
-        num_matrix = self.image2num(animal_images)
+        self.num_matrix = self.image2num(animal_images)
         # 四周添加上0，做成地图矩阵
-        map_matrix = np.zeros((num_matrix.shape[0] + 2, num_matrix.shape[1] + 2), dtype=np.uint32)
+        self.map_matrix = np.zeros((self.num_matrix.shape[0] + 2, self.num_matrix.shape[1] + 2), dtype=np.uint32)
         # print(map_matrix.shape)
-        map_matrix[1:9, 1:13] = num_matrix
-        print(map_matrix)
+        self.map_matrix[1:9, 1:13] = self.num_matrix
+
+        print(self.map_matrix)
+
+        row_num = self.map_matrix.shape[0]
+        col_num = self.map_matrix.shape[1]
+
+        # self.click_and_set0(1,5,1,7)
+        print(row_num)
+        print(col_num)
+
+        for i in range(1, row_num):
+            for j in range(1, col_num):
+
+                if self.map_matrix[i][j] == 0:
+                    continue
+
+                for l in range(1, row_num):
+                    for k in range(1, col_num):
+
+                        if i == l and j == k:
+                            continue
+
+                        if self.map_matrix[i][j] == 0 or self.map_matrix[l][k] == 0:
+                            continue
+
+                        if self.is_reachable(i,j,l,k):
+
+                            self.click_and_set0(i,j,l,k)
+                            print(self.map_matrix)
+                            # break
 
 
 if __name__ == "__main__":
     # 窗口句柄，使用windspy获取
     wdname = "宠物连连看经典版2小游戏,在线玩,4399小游戏 - 360安全浏览器 10.0"
     game_assist = GameAssist(wdname)
-    # game_assist.start()
+    game_assist.start()
