@@ -25,6 +25,7 @@ class GameAssist:
         self.base_x =  399
         self.base_y =  305
 
+        self.click_time = 0
         self.mouse = PyMouse()
         # 获取窗口的句柄
         self.hwnd = win32gui.FindWindow(0, wdname)
@@ -34,10 +35,6 @@ class GameAssist:
             exit(1)
         # 将该窗口显示在最前面
         win32gui.SetForegroundWindow(self.hwnd)
-
-
-
-
 
     def screen_grab(self):
         # 获取整个屏幕截图
@@ -95,9 +92,6 @@ class GameAssist:
 
             num_str01_matrix.append(num_row)
 
-        # print(sum(map(operator.ne, num_str01_matrix[0][9], num_str01_matrix[7][0])))
-        # animal_images[0][9].show()
-        # animal_images[7][0].show()
 
         for i in range(12):
             print("(0,"+ str(i) +")", end='')
@@ -153,7 +147,6 @@ class GameAssist:
                 ans_list.append([x, col])
             else:
                 break
-
             col = col + 1
 
         return ans_list
@@ -164,6 +157,10 @@ class GameAssist:
             tmp = y1
             y1  = y2
             y2  = tmp
+
+        if y2 - y1 == 1:
+            return True
+
         for i in range(y1+1, y2):
             if self.map_matrix[x][i] != 0:
                 return False
@@ -176,9 +173,14 @@ class GameAssist:
             tmp = x1
             x1 = x2
             x2 = tmp
+
+        if x2 - x1 == 1:
+            return True
+
         for i in range(x1+1, x2):
             if self.map_matrix[i][y] != 0:
                 return False
+
         return True
 
 
@@ -191,15 +193,19 @@ class GameAssist:
         list1  = self.get_direct_connected(x1, y1)
         list2  = self.get_direct_connected(x2, y2)
 
+
         for x1,y1 in list1:
             for x2,y2 in list2:
+
+                # if x1 == x2 and y1 == y2:
+                #     continue
 
                 if x1 == x2:
                     if self.is_row_connected(x1, y1, y2):
                         return True
 
                 elif y1 == y2:
-                    if self.is_col_connected(x1, x2, y2):
+                    if self.is_col_connected(x1, x2, y1):
                         return True
         return False
 
@@ -212,28 +218,15 @@ class GameAssist:
         c_x2 =  int(self.base_x + (y2 - 1)*self.width + self.width/2)
         c_y2 =  int(self.base_y + (x2 - 1)*self.width + self.width/2)
 
-        time.sleep(1)
+        time.sleep(self.click_time)
         self.mouse.click(c_x1, c_y1)
-        time.sleep(1)
+        time.sleep(self.click_time)
         self.mouse.click(c_x2, c_y2)
 
         self.map_matrix[x1][y1] = 0
         self.map_matrix[x2][y2] = 0
 
-
-
-    def start(self):
-        # 获取图像矩阵
-        animal_images = self.screen_grab()
-        # 获取图标的数字矩阵
-        self.num_matrix = self.image2num(animal_images)
-        # 四周添加上0，做成地图矩阵
-        self.map_matrix = np.zeros((self.num_matrix.shape[0] + 2, self.num_matrix.shape[1] + 2), dtype=np.uint32)
-        # print(map_matrix.shape)
-        self.map_matrix[1:9, 1:13] = self.num_matrix
-
-        print(self.map_matrix)
-
+    def scan_game(self):
         row_num = self.map_matrix.shape[0]
         col_num = self.map_matrix.shape[1]
 
@@ -253,14 +246,28 @@ class GameAssist:
                         if i == l and j == k:
                             continue
 
-                        if self.map_matrix[i][j] == 0 or self.map_matrix[l][k] == 0:
+                        if self.map_matrix[l][k] == 0:
                             continue
 
-                        if self.is_reachable(i,j,l,k):
-
-                            self.click_and_set0(i,j,l,k)
-                            print(self.map_matrix)
+                        if self.is_reachable(i, j, l, k):
+                            self.click_and_set0(i, j, l, k)
+                            # print(self.map_matrix)
                             # break
+
+
+    def start(self):
+        # 获取图像矩阵
+        animal_images = self.screen_grab()
+        # 获取图标的数字矩阵
+        self.num_matrix = self.image2num(animal_images)
+        # 四周添加上0，做成地图矩阵
+        self.map_matrix = np.zeros((self.num_matrix.shape[0] + 2, self.num_matrix.shape[1] + 2), dtype=np.uint32)
+        # print(map_matrix.shape)
+        self.map_matrix[1:9, 1:13] = self.num_matrix
+
+        self.scan_game()
+        self.scan_game() # 很不优雅地扫描两遍，数据量小，没有关系
+
 
 
 if __name__ == "__main__":
