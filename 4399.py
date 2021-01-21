@@ -18,24 +18,28 @@ from pymouse import PyMouse
 
 class GameAssist:
     def __init__(self, wdname):
-        self.num_matrix = []
-        self.map_matrix = []
+        self.num_matrix = []  # 数字矩阵，每种数字代表一种动物，1-12
+        self.map_matrix = []  # 在self.num_matrix 周围加了一圈0
 
-        self.width = 71
-        self.base_x =  399
-        self.base_y =  305
+        self.width = 71       # 每个图标的宽度，71像素
+        self.base_x =  399    # (self.base_x, slef.base_y) 整个连连看可点击位置的左上角
+        self.base_y =  305    # 可以截图后通过windows自带的画图工具找到某点的坐标
 
-        self.click_time = 0
+        self.click_time = 0.2 # 模拟鼠标每次点击的间隔
+
         self.mouse = PyMouse()
+
         # 获取窗口的句柄
         self.hwnd = win32gui.FindWindow(0, wdname)
-
         if self.hwnd == 0:
             print('no such hwnd')
             exit(1)
         # 将该窗口显示在最前面
         win32gui.SetForegroundWindow(self.hwnd)
 
+    '''
+        获取屏幕截图，并将图标分割
+    '''
     def screen_grab(self):
         # 获取整个屏幕截图
         image_grab = ImageGrab.grab()
@@ -60,6 +64,7 @@ class GameAssist:
                 x2 = x1 + offset
                 y2 = y1 + offset
 
+                # 5px的偏移是为了去掉小图标周围，只保留中间，这样区分不同的图片更容易
                 images_row.append(animals_iamge.crop((x1+5, y1+5, x2-5, y2-5)))
 
             images_list.append(images_row)
@@ -75,10 +80,12 @@ class GameAssist:
 
         return -1
 
+    '''
+        将每个图片转换成一个数字，相同的图标数字相同
+    '''
     def image2num(self, animal_images):
 
         num_str01_matrix = []
-
         for i in range(8):
             num_row = []
             for j in range(12):
@@ -112,6 +119,42 @@ class GameAssist:
                 else:
                     num_matrix[i][j] = index+1
         return num_matrix
+
+
+
+
+
+
+    def is_row_connected(self, x, y1,  y2):
+        if y1 > y2:
+            tmp = y1
+            y1  = y2
+            y2  = tmp
+
+        if y2 - y1 == 1:
+            return True
+
+        for i in range(y1+1, y2):
+            if self.map_matrix[x][i] != 0:
+                return False
+        return True
+
+
+
+    def is_col_connected(self, x1, x2, y):
+        if x1 > x2:
+            tmp = x1
+            x1 = x2
+            x2 = tmp
+
+        if x2 - x1 == 1:
+            return True
+
+        for i in range(x1+1, x2):
+            if self.map_matrix[i][y] != 0:
+                return False
+
+        return True
 
     def get_direct_connected(self, x, y):
         # 同一行直接相连的点
@@ -151,40 +194,6 @@ class GameAssist:
 
         return ans_list
 
-
-    def is_row_connected(self, x, y1,  y2):
-        if y1 > y2:
-            tmp = y1
-            y1  = y2
-            y2  = tmp
-
-        if y2 - y1 == 1:
-            return True
-
-        for i in range(y1+1, y2):
-            if self.map_matrix[x][i] != 0:
-                return False
-        return True
-
-
-
-    def is_col_connected(self, x1, x2, y):
-        if x1 > x2:
-            tmp = x1
-            x1 = x2
-            x2 = tmp
-
-        if x2 - x1 == 1:
-            return True
-
-        for i in range(x1+1, x2):
-            if self.map_matrix[i][y] != 0:
-                return False
-
-        return True
-
-
-
     def is_reachable(self, x1, y1, x2, y2):
         # 如果数字不相同，直接返回不可到达
         if self.map_matrix[x1][y1] != self.map_matrix[x2][y2]:
@@ -196,10 +205,6 @@ class GameAssist:
 
         for x1,y1 in list1:
             for x2,y2 in list2:
-
-                # if x1 == x2 and y1 == y2:
-                #     continue
-
                 if x1 == x2:
                     if self.is_row_connected(x1, y1, y2):
                         return True
@@ -209,7 +214,9 @@ class GameAssist:
                         return True
         return False
 
-
+    '''
+        依次点击(x1, y1) (x2, y2), 并且将这两个位置的数字变成0
+    '''
     def click_and_set0(self, x1, y1, x2, y2):
         # 确定需要点击的坐标的中心位置
         c_x1 =  int(self.base_x + (y1 - 1)*self.width + self.width/2)
@@ -223,9 +230,13 @@ class GameAssist:
         time.sleep(self.click_time)
         self.mouse.click(c_x2, c_y2)
 
+        # 矩阵中设为0
         self.map_matrix[x1][y1] = 0
         self.map_matrix[x2][y2] = 0
 
+    '''
+        扫描整个矩阵，并点击相消
+    '''
     def scan_game(self):
         row_num = self.map_matrix.shape[0]
         col_num = self.map_matrix.shape[1]
@@ -251,8 +262,6 @@ class GameAssist:
 
                         if self.is_reachable(i, j, l, k):
                             self.click_and_set0(i, j, l, k)
-                            # print(self.map_matrix)
-                            # break
 
 
     def start(self):
@@ -265,8 +274,9 @@ class GameAssist:
         # print(map_matrix.shape)
         self.map_matrix[1:9, 1:13] = self.num_matrix
 
+        print(self.map_matrix)
         self.scan_game()
-        self.scan_game() # 很不优雅地扫描两遍，数据量小，没有关系
+        self.scan_game() # 很不优雅地扫描两遍，不过数据量小，没有关系
 
 
 
